@@ -24,6 +24,11 @@ extern int dirlen;
 #include <sys/stat.h>
 #include "bbccon.h"
 
+#ifdef __riscos
+#include "kernel.h"
+#include "swis.h"
+#endif
+
 #ifdef _WIN32
 #include <io.h>
 typedef int timer_t ;
@@ -605,6 +610,12 @@ static int wild (char *ebx, char *edx)
 
 void oscli (char *cmd)
 {
+#ifdef __riscos
+    _kernel_oserror *err;
+    err = _kernel_oscli(cmd);
+    if (err)
+        error(err->errnum, err->errmess);
+#else
 	int b = 0, h = POWR2, n ;
 	char cpy[MAX_PATH] ;
 	char path[MAX_PATH], path2[MAX_PATH] ;
@@ -1198,6 +1209,7 @@ void oscli (char *cmd)
 		} ;
 
 	error (254, "Bad command") ;
+#endif
 }
 
 // Shell sort

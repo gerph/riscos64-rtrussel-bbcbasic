@@ -21,6 +21,11 @@
 #define QRYTIME 1000 // Milliseconds to wait for cursor query response
 #define QSIZE 32     // Twice longest expected escape sequence
 
+#ifdef __riscos
+#include "kernel.h"
+#include "swis.h"
+#endif
+
 #ifdef _WIN32
 #include <windows.h>
 #include <conio.h>
@@ -89,6 +94,7 @@ timer_t UserTimerID ;
 unsigned int palette[256] ;
 void *TTFcache[1] ;
 
+#ifndef __riscos
 // Array of VDU command lengths:
 static int vdulen[] = {
    0,   1,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -100,6 +106,7 @@ static unsigned char xkey[64] = {
  145, 146, 147, 148,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
    0,   0, 134, 135,   0, 132, 133,   0,   0,   0,   0,   0,   0,   0,   0, 149,
    0, 150, 151, 152, 153, 154,   0, 155, 156,   0,   0,   0,   0,   0,   0,   0 } ;
+#endif
 
 // Declared in bbcans.c:
 void oscli (char *) ;
@@ -190,6 +197,8 @@ static DWORD WINAPI myThread (void *parm)
 	return 0 ;
 }
 
+#elif defined(__riscos)
+/* Nothing */
 #else
 
 void *myThread (void *parm)
@@ -234,6 +243,7 @@ static void *mymap (uintptr_t size)
 }
 #endif
 
+#ifndef __riscos
 // Put event into event queue, unless full:
 int putevt (heapptr handler, int msg, int wparam, int lparam)
 {
@@ -249,7 +259,9 @@ int putevt (heapptr handler, int msg, int wparam, int lparam)
 	evtqw = al ;
 	return 1 ;
 }
+#endif
 
+#ifndef __riscos
 // Get event from event queue, unless empty:
 static heapptr getevt (void)
 {
@@ -269,7 +281,9 @@ static heapptr getevt (void)
 		flags |= ALERT ;
 	return handler ;
 }
+#endif
 
+#ifndef __riscos
 // Put keycode to keyboard queue:
 static int putkey (char key)
 {
@@ -288,7 +302,9 @@ static int putkey (char key)
 	    }
 	return 0 ;
 }
+#endif
 
+#ifndef __riscos
 // Get keycode (if any) from keyboard queue:
 int getkey (unsigned char *pkey)
 {
@@ -301,7 +317,9 @@ int getkey (unsigned char *pkey)
 	    }
 	return 0 ;
 }
+#endif
 
+#ifndef __riscos
 // Get millisecond tick count:
 unsigned int GetTicks (void)
 {
@@ -426,6 +444,8 @@ void getcsr(int *px, int *py)
 		if (py != NULL) *py = -1 ;
 	    }
 }
+
+#endif
 
 // SOUND Channel,Amplitude,Pitch,Duration
 void sound (short chan, signed char ampl, unsigned char pitch, unsigned char duration)
@@ -573,6 +593,8 @@ double fltcall_ (double (*APIfunc) (size_t, size_t, size_t, size_t, size_t, size
 #pragma GCC reset_options
 #endif
 
+#ifdef __riscos
+#else
 // Call a function in the context of the GUI thread:
 size_t guicall (void *func, PARM *parm)
 {
@@ -582,6 +604,9 @@ size_t guicall (void *func, PARM *parm)
 // Check for Escape (if enabled) and kill:
 void trap (void)
 {
+#ifdef __riscos
+    /* FIXME: RISCOS can do this with OS_ReadEscapeState ? */
+#else
 	stdin_handler (NULL, NULL) ;
 
 	if (flags & KILL)
@@ -598,14 +623,20 @@ void trap (void)
 		    }
 		error (17, NULL) ; // 'Escape'
 	    }
+#endif
 }
+#endif
 
 // Test for escape, kill, pause, single-step, flash and alert:
 heapptr xtrap (void)
 {
+#ifdef __riscos
+    /* FIXME: RISCOS can do this with OS_ReadEscapeState ? */
+#else
 	trap () ;
 	if (flags & ALERT)
 		return getevt () ;
+#endif
 	return 0 ;
 }
 
@@ -657,6 +688,9 @@ static int rdkey (unsigned char *pkey)
 // Wait a maximum period for a keypress, or test key asynchronously:
 int oskey (int wait)
 {
+#ifdef __riscos
+    return __os_inkey(wait);
+#else
 	if (wait >= 0)
 	    {
 		unsigned int start = GetTicks () ;
@@ -675,6 +709,7 @@ int oskey (int wait)
 	if (wait == -256)
 		return 's' ;
 
+#endif
 	return 0 ;
 }
 
@@ -682,6 +717,13 @@ int oskey (int wait)
 unsigned char osrdch (void)
 {
 	unsigned char key ;
+#ifdef __riscos
+    _kernel_oserror *err;
+    key = 0;
+    err = _swix(OS_ReadC, _OUT(0), &key);
+    if (err)
+        error(err->errnum, err->errmess);
+#else
 	if (exchan)
 	{
 		if (fread (&key, 1, 1, exchan))
@@ -698,12 +740,16 @@ unsigned char osrdch (void)
 		usleep (5000) ;
 		trap () ;
 	}
+#endif
 	return key ;
 }
 
 // Output byte to VDU stream:
 void oswrch (unsigned char vdu)
 {
+#ifdef __riscos
+    __os_writec(vdu);
+#else
 	unsigned char *pqueue = vduq ;
 
 	if (optval & 0x0F)
@@ -779,20 +825,59 @@ void oswrch (unsigned char vdu)
 //  vduq->  n  v
 
 	xeqvdu (*(int*)(pqueue + 8) & 0xFFFF, *(int*)(pqueue + 4), *(int*)pqueue) ;
+#endif
 }
 
 // Prepare for outputting an error message:
 void reset (void)
 {
+#ifdef __riscos
+#else
 	vduq[10] = 0 ;	// Flush VDU queue
 	keyptr = NULL ;	// Cancel *KEY expansion
 	optval = 0 ;	// Cancel I/O redirection
 	reflag = 0 ;	// *REFRESH ON
+#endif
 }
+
+
+
+
+/*************************************************** Gerph *********
+ Function:      readline
+ Description:   Call OS_ReadLine for input
+ Parameters:    line-> line to read
+                len = max length including terminator
+ Returns:       1 for success, 0 for failure
+ ******************************************************************/
+static int readline(char *line, int len)
+{
+    _kernel_oserror *err;
+    int read;
+    uint32_t flags;
+    err = _swix(OS_ReadLine32, _INR(0, 4)|_OUT(1)|_OUT(_FLAGS), line, len, 32, 128, 0, &read, &flags);
+#ifndef ErrorNumber_ModuleBadSWI
+#define ErrorNumber_ModuleBadSWI          0x110 /*  Token for internationalised message */
+#endif
+    if (err && err->errnum == ErrorNumber_ModuleBadSWI)
+    {
+        err = _swix(OS_ReadLine, _INR(0, 4)|_OUT(1)|_OUT(_FLAGS), line, len, 32, 128, 0, &read, &flags);
+    }
+    if (err)
+        return 0;
+    if (flags & _C)
+        return 0;
+    line[read] = '\0';
+    return 1;
+}
+
 
 // Input and edit a string :
 void osline (char *buffer)
 {
+#ifdef __riscos
+    readline(buffer, 256);
+#else
 	static char *history[HISTORY] = {NULL} ;
 	static int empty = 0 ;
 	int current = empty ;
@@ -991,20 +1076,35 @@ void osline (char *buffer)
 				oswrch (0) ;
 		    }
 	    }
+#endif
 }
 
 // Get TIME
 int getime (void)
 {
+#ifdef __riscos
+    uint32_t quin[2];
+    quin[0] = 0;
+    _swix(OS_Word, _INR(0, 1), 2, quin);
+    return quin[0];
+#else
 	unsigned int n = GetTicks () ;
 	if (n < lastick)
 		timoff += 0x19999999 ;
 	lastick = n ;
 	return n / 10 + timoff ;
+#endif
 }
 
 int getims (void)
 {
+#ifdef __riscos
+    unsigned char string[256];
+    string[0] = 0;
+    _swix(OS_Word, _INR(0, 1), 14, string);
+    strncpy(accs, string, 24);
+    return strlen(accs);
+#else
 	char *at ;
 	time_t tt ;
 
@@ -1019,19 +1119,34 @@ int getims (void)
 	accs[3] = '.' ;
 	accs[15] = ',' ;
 	return 24 ;
+#endif
 }
 
 // Put TIME
 void putime (int n)
 {
+#ifdef __riscos
+    uint32_t quin[2];
+    quin[0] = n;
+    _swix(OS_Word, _INR(0, 1), 2, quin);
+#else
 	lastick = GetTicks () ;
 	timoff = n - lastick / 10 ;
+#endif
 }
 
 // Wait for a specified number of centiseconds:
 // On some platforms specifying a negative value causes a task switch
 void oswait (int cs)
 {
+#ifdef __riscos
+    uint32_t start = clock();
+    do {
+        _swix(OS_Byte, _IN(0), 19);
+        if (clock() - start >= cs)
+            break;
+    } while (1);
+#else
 	unsigned int start = GetTicks () ;
 	if (cs < 0)
 	    {
@@ -1045,39 +1160,51 @@ void oswait (int cs)
 		usleep (1000) ;
 	    }
 	while ((unsigned int)(GetTicks () - start) < cs) ;
+#endif
 }
 
 
 // MOUSE x%, y%, b%
 void mouse (int *px, int *py, int *pb)
 {
+#ifdef __riscos
+    _swix(OS_Mouse, _OUTR(0, 2), px, py, pb);
+#else
 	if (px) *px = 0 ;
 	if (py) *py = 0 ;
 	if (pb) *pb = 0 ;
+#endif
 }
 
 // MOUSE ON [type]
 void mouseon (int type)
 {
+    /* FIXME: RISC OS can do this */
 }
 
 // MOUSE OFF
 void mouseoff (void)
 {
+    /* FIXME: RISC OS can do this */
 }
 
 // MOUSE TO x%, y%
 void mouseto (int x, int y)
 {
+    /* FIXME: RISC OS can do this */
 }
 
 // Get address of an API function:
 void *sysadr (char *name)
 {
+#ifdef __riscos
+    return NULL; /* Not implemented on RISC OS */
+#else
 	void *addr = NULL ;
 	if (addr != NULL)
 		return addr ; 
 	return dlsym (RTLD_DEFAULT, name) ;
+#endif
 }
 
 // Call an emulated OS subroutine (if CALL or USR to an address < 0x10000)
@@ -1106,17 +1233,26 @@ int oscall (int addr)
 			return 0 ;
 
 		case 0xFFF1: // OSWORD
+#ifdef __riscos
+            /* FIXME: RISC OS can do this */
+#else
 			memcpy (xy + 1, &bbcfont[*(unsigned char*)(xy) << 3], 8) ;
+#endif
 			return 0 ;
 
 		case 0xFFF4: // OSBYTE
+#ifdef __riscos
+            /* FIXME: RISC OS can do this */
+#else
 			return (vgetc (0x80000000, 0x80000000) << 8) ;
+#endif
 
 		case 0xFFF7: // OSCLI
 			oscli (xy) ;
 			return 0 ; 
 
 		default:
+            /* FIXME: RISC OS can do this */
 			error (8, NULL) ; // 'Address out of range'
 	    }
 	return 0 ;
@@ -1144,6 +1280,7 @@ heapptr oshwm (void *addr, int settop)
 	    }
 }
 
+#ifndef __riscos
 // Get a file context from a channel number:
 static FILE *lookup (void *chan)
 {
@@ -1158,15 +1295,20 @@ static FILE *lookup (void *chan)
 		error (222, "Invalid channel") ;
 	return file ;
 }
+#endif
 
 // Load a file into memory:
 void osload (char *p, void *addr, unsigned int max)
 {
 	int n ;
 	FILE *file ;
+#ifdef __riscos
+    file = fopen (p, "rb") ;
+#else
 	if (NULL == setup (path, p, ".bbc", '\0', NULL))
 		error (253, "Bad string") ;
 	file = fopen (path, "rb") ;
+#endif
 	if (file == NULL)
 		error (214, "File or path not found") ;
 	n = fread (addr, 1, max, file) ;
@@ -1180,20 +1322,47 @@ void ossave (char *p, void *addr, unsigned int len)
 {
 	int n ;
 	FILE *file ;
+#ifdef __riscos
+    file = fopen (p, "w+b") ;
+#else
 	if (NULL == setup (path, p, ".bbc", '\0', NULL))
 		error (253, "Bad string") ;
 	file = fopen (path, "w+b") ;
+#endif
 	if (file == NULL)
 		error (214, "Couldn't create file") ;
 	n = fwrite (addr, 1, len, file) ;
 	fclose (file) ;
 	if (n < len)
 		error (189, "Couldn't write to file") ;
+#ifdef __riscos
+    _swix(OS_File, _INR(0, 2), 18, p, 0xFFB); /* Set type as BASIC */
+#endif
 }
 
 // Open a file:
 void *osopen (int type, char *p)
 {
+#ifdef __riscos
+    uint32_t handle=0;
+    int mode = 0;
+    switch (type) {
+        case 0: /* OPENIN */
+            mode = 0x40;
+            break;
+        case 1: /* OPENOUT */
+            mode = 0x80;
+            break;
+        default: /* OPENUP */
+            mode = 0xC0;
+            break;
+    }
+    _kernel_oserror *err;
+    err = _swix(OS_Find, _INR(0, 1)|_OUT(0), mode, p, &handle);
+    if (err)
+        error(err->errnum, err->errmess);
+    return (void*)handle;
+#else
 	int chan, first, last ;
 	FILE *file ;
 	if (setup (path, p, ".bbc", '\0', NULL) == NULL)
@@ -1235,8 +1404,10 @@ void *osopen (int type, char *p)
 	fclose (file) ;
 	error (192, "Too many open files") ;
 	return NULL ; // never happens
+#endif
 }
 
+#ifndef __riscos
 // Read file to 256-byte buffer:
 static void readb (FILE *context, unsigned char *buffer, FCB *pfcb)
 {
@@ -1305,10 +1476,18 @@ static int closeb (void *chan)
 		filbuf[(size_t)chan] = 0 ;
 	return result ;
 }
+#endif
 
 // Read a byte:
 unsigned char osbget (void *chan, int *peof)
 {
+#ifdef __riscos
+    /* FIXME: EOF not reported */
+    unsigned char b = 0;
+    *peof = 0;
+    _swix(OS_BGet, _IN(0)|_OUT(0), chan, &b);
+    return b;
+#else
 	unsigned char byte = 0 ;
 	if (peof != NULL)
 		*peof = 0 ;
@@ -1345,11 +1524,15 @@ unsigned char osbget (void *chan, int *peof)
 	if ((0 == fread (&byte, 1, 1, lookup (chan))) && (peof != NULL))
 		*peof = 1 ;
 	return byte ;
+#endif
 }
 
 // Write a byte:
 void osbput (void *chan, unsigned char byte)
 {
+#ifdef __riscos
+    _swix(OS_BGet, _INR(0, 1), chan, byte);
+#else
 	if (chan <= (void *) MAX_PORTS)
 	    {
 #ifdef _WIN32
@@ -1379,11 +1562,20 @@ void osbput (void *chan, unsigned char byte)
 	    }
 	if (0 == fwrite (&byte, 1, 1, lookup (chan)))
 		error (189, "Couldn't write to file") ;
+#endif
 }
 
 // Get file pointer:
 long long getptr (void *chan)
 {
+#ifdef __riscos
+    unsigned long cur = 0;
+    _kernel_oserror *err;
+    err = _swix(OS_Args, _INR(0, 1)|_OUT(2), 0, cur, &cur);
+    if (err)
+        error (err->errnum, err->errmess) ;
+    return cur;
+#else
 	myfseek (lookup (chan), 0, SEEK_CUR) ;
 	long long ptr = myftell (lookup (chan)) ;
 	if (ptr == -1)
@@ -1401,11 +1593,15 @@ long long getptr (void *chan)
 			ptr += 256 ;
 	    }
 	return ptr ;
+#endif
 }
 
 // Set file pointer:
 void setptr (void *chan, long long ptr)
 {
+#ifdef __riscos
+    _swix(OS_Args, _INR(0, 2), 1, chan, ptr);
+#else
 	if ((chan > (void *)MAX_PORTS) && (chan <= (void *)(MAX_PORTS+MAX_FILES)))
 	    {
 		int index = (size_t) chan - MAX_PORTS - 1 ;
@@ -1418,11 +1614,20 @@ void setptr (void *chan, long long ptr)
 	    }
 	if (-1 == myfseek (lookup (chan), ptr, SEEK_SET))
 		error (189, "Couldn't set file pointer") ;
+#endif
 }
 
 // Get file size:
 long long getext (void *chan)
 {
+#ifdef __riscos
+    _kernel_oserror *err;
+    unsigned long size = 0;
+    err = _swix(OS_Args, _INR(0, 1)|_OUT(2), 0, chan, &size);
+    if (err)
+        error(err->errnum, err->errmess);
+    return size;
+#else
 	FILE *file = lookup (chan) ;
 	if (chan <= (void *)MAX_PORTS)
 	    {
@@ -1449,11 +1654,20 @@ long long getext (void *chan)
 	if (newptr > size)
 		return newptr ;
 	return size ;
+#endif
 }
 
 // Get EOF status:
 long long geteof (void *chan)
 {
+#ifdef __riscos
+    unsigned long eof = 0;
+    _kernel_oserror *err;
+    err = _swix(OS_Args, _INR(0, 1)|_OUT(2), 0, chan, &eof);
+    if (err)
+        error(err->errnum, err->errmess);
+    return eof ? -1 : 0;
+#else
 	if ((chan > (void *)MAX_PORTS) && (chan <= (void *)(MAX_PORTS+MAX_FILES)))
 	    {
 		FCB *pfcb = &fcbtab[(size_t) chan - MAX_PORTS - 1] ;
@@ -1461,11 +1675,18 @@ long long geteof (void *chan)
 			return 0 ;
 	    }
 	return -(getptr (chan) >= getext (chan)) ;
+#endif
 }
 
 // Close file (if chan = 0 all open files closed and errors ignored):
 void osshut (void *chan)
 {
+#ifdef __riscos
+    _kernel_oserror *err;
+    err = _swix(OS_Find, _INR(0, 1), 0, chan);
+    if (err)
+        error(err->errnum, err->errmess);
+#else
 	if (chan == NULL)
 	    {
 		int chan ;
@@ -1478,6 +1699,7 @@ void osshut (void *chan)
 	    }
 	if (closeb (chan))
 		error (189, "Couldn't close file") ;
+#endif
 }
 
 // Start interpreter:
@@ -1499,12 +1721,21 @@ int entry (void *immediate)
 	vflags = UTF8 ;				// Not |= (fails on Linux build)
 #endif
 
+#ifdef __riscos
+    prand.l = (unsigned int) clock() ;  /// Seed PRNG
+    prand.h = (prand.l == 0) ;
+#else
 	prand.l = (unsigned int) GetTicks () ;	/// Seed PRNG
 	prand.h = (prand.l == 0) ;
+#endif
 	rnd () ;				// Randomise !
 
+#ifdef __riscos
+    /* Nothing here */
+#else
 	memset (keystr, 0, 256) ;
 	xeqvdu (0x1700, 0, 0x1F) ;		// initialise VDU drivers
+#endif
 	spchan = NULL ;
 	exchan = NULL ;
 
@@ -1648,6 +1879,7 @@ void SystemIO (int flag)
 }
 #endif
 
+#ifndef __riscos
 static void SetLoadDir (char *path)
 {
 	char temp[MAX_PATH] ;
@@ -1671,6 +1903,7 @@ static void SetLoadDir (char *path)
 	strcat (szLoadDir, "/") ;
 #endif
 }
+#endif
 
 int main (int argc, char* argv[])
 {
@@ -1878,6 +2111,7 @@ pthread_t hThread = NULL ;
 	if (p)
 		*p = '\0' ;
 
+#ifndef __riscos
 #ifdef _WIN32
 	strcat (szTempDir, "\\") ;
 	strcat (szLibrary, "\\lib\\") ;
@@ -1889,13 +2123,18 @@ pthread_t hThread = NULL ;
 	strcat (szUserDir, "/bbcbasic/") ;
 	mkdir (szUserDir, 0777) ;
 #endif
+#endif
 
+#ifndef __riscos
 	SetLoadDir (szAutoRun) ;
+#endif
 
 	if (argc < 2)
 		*szCmdLine = 0 ;
+#ifndef __riscos
 	else if (TestFile == NULL)
 		chdir (szLoadDir) ;
+#endif
 
 	// Set console for raw input and ANSI output:
 #ifdef _WIN32
@@ -1907,6 +2146,8 @@ pthread_t hThread = NULL ;
 	if (GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), (LPDWORD) &orig_stdin)) 
 		SetConsoleMode (GetStdHandle(STD_INPUT_HANDLE), ENABLE_VIRTUAL_TERMINAL_INPUT) ; 
 	hThread = CreateThread (NULL, 0, myThread, 0, 0, NULL) ;
+#elif defined(__riscos)
+    /* Nothing to do */
 #else
 	tcgetattr (STDIN_FILENO, &orig_termios) ;
 	struct termios raw = orig_termios ;
@@ -1924,13 +2165,17 @@ pthread_t hThread = NULL ;
 	timerqueue = dispatch_queue_create ("timerQueue", 0) ;
 #endif
 
+#ifndef __riscos
 	UserTimerID = StartTimer (250) ;
+#endif
 
 	flags = 0 ;
 	exitcode = entry (immediate) ;
 
+#ifndef __riscos
 	if (UserTimerID)
 		StopTimer (UserTimerID) ;
+#endif
 
 #ifdef __APPLE__
         dispatch_release (timerqueue) ;
@@ -1944,6 +2189,8 @@ pthread_t hThread = NULL ;
 		SetConsoleMode (GetStdHandle(STD_OUTPUT_HANDLE), orig_stdout) ;
 	if (orig_stdin != -1)
 		SetConsoleMode (GetStdHandle(STD_INPUT_HANDLE), orig_stdin) ;
+#elif defined(__riscos)
+    /* Nothing to do */
 #else
 	if (isatty (STDOUT_FILENO))
 		printf ("\033[0m\033[!p") ;
