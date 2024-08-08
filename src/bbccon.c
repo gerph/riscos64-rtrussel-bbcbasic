@@ -444,6 +444,11 @@ void getcsr(int *px, int *py)
 		if (py != NULL) *py = -1 ;
 	    }
 }
+#else
+void getcsr(int *px, int *py)
+{
+    _swix(OS_Byte, _IN(0) | _OUTR(1,2), 135, px, py);
+}
 
 #endif
 
@@ -600,6 +605,7 @@ size_t guicall (void *func, PARM *parm)
 {
 	return apicall_ (func, parm) ;
 }
+#endif
 
 // Check for Escape (if enabled) and kill:
 void trap (void)
@@ -625,7 +631,6 @@ void trap (void)
 	    }
 #endif
 }
-#endif
 
 // Test for escape, kill, pause, single-step, flash and alert:
 heapptr xtrap (void)

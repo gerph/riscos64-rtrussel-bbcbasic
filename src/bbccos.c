@@ -99,6 +99,7 @@ int getkey (unsigned char *) ;
 // Global variables:
 extern timer_t UserTimerID ;
 
+#ifndef __riscos
 static short modetab[NUMMODES][5] =
 {
         {640,512,8,16,2},      // MODE 0
@@ -214,6 +215,7 @@ static void newline (int *px, int *py)
 		while ((getkey (&ch) == 0) && ((flags & (ESCFLG | KILL)) == 0)) ;
 	    }
 }
+#endif
 
 /*****************************************************************\
 *       VDU codes                                                 *
@@ -233,6 +235,7 @@ static void newline (int *px, int *py)
 //          a  |
 //          n  v
 
+#ifndef __riscos
 void xeqvdu (int code, int data1, int data2)
 {
 	int vdu = code >> 8 ;
@@ -450,6 +453,7 @@ void xeqvdu (int code, int data1, int data2)
 	    }
 	fflush (stdout) ;
 }
+#endif
 
 // Parse a filespec, return pointer to terminator.
 // Note that source string is CR-terminated
@@ -507,6 +511,7 @@ char *setup (char *dst, char *src, char *ext, char term, unsigned char *pflag)
 	return src - 1 ;
 }
 
+#ifndef __riscos
 // Parse a *KEY string:
 // Note that source string is CR-terminated
 static int parse (char *dst, char *src, char term)
@@ -607,14 +612,19 @@ static int wild (char *ebx, char *edx)
 	}
 	return 0 ;
 }
+#endif
 
 void oscli (char *cmd)
 {
 #ifdef __riscos
     _kernel_oserror *err;
-    err = _kernel_oscli(cmd);
-    if (err)
+    int failed;
+    failed = _kernel_oscli(cmd);
+    if (failed)
+    {
+        err = _kernel_last_oserror();
         error(err->errnum, err->errmess);
+    }
 #else
 	int b = 0, h = POWR2, n ;
 	char cpy[MAX_PATH] ;

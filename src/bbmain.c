@@ -10,6 +10,7 @@
 *       Version 1.40a, 03-Apr-2024                                *
 \*****************************************************************/
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -416,6 +417,27 @@ static signed char tokit (char **pesi, const signed char *ebx)
 	return **pesi ;
 }
 
+static unsigned short extract_lineno(char *str, int *nread, unsigned short deflino)
+{
+    unsigned long llino = deflino;
+#ifdef __riscos
+    if (*str >= '0' && *str <= '9') /* avoid unimplemented scanf */
+    {
+        char *end = str;
+        llino = strtol(str, &end, 10);
+        if (end == str)
+            llino = deflino;
+        *nread = end - str;
+    }
+    return llino;
+#else
+    sscanf (str, "%lu%n", &llino, nread) ;
+    if (llino > 65535)
+        llino = 65535;
+    return llino;
+#endif
+}
+
 // Lexical analysis:
 char *lexan (char *esi, char *ebx, unsigned char mode)
 {
@@ -437,7 +459,9 @@ char *lexan (char *esi, char *ebx, unsigned char mode)
 				unsigned int lino = 0 ;
 				int n = 0 ;
 				if (al != '+')
-					sscanf (esi, " %u%n", &lino, &n) ;
+                {
+                    extract_lineno(esi, &n, lino);
+                }
 				esi += n ;
 				if (lino)
 				    {
@@ -1420,8 +1444,25 @@ static void lrange (char *ptr, unsigned short *plo, unsigned short *phi)
 	int n = 0 ;
 	*plo = 0 ;
 	*phi = 0 ;
-	if (sscanf (ptr, "%hu ,%n%hu", plo, &n, phi) == 0)
-		sscanf (ptr, " ,%n%hu", &n, phi) ;
+    while (*ptr == ' ')
+        ptr++;
+    if (*ptr >= '0' && *ptr <= '9')
+    {
+        *plo = extract_lineno(ptr, &n, 0);
+        ptr += n;
+    }
+    while (*ptr == ' ')
+        ptr++;
+    if (*ptr == ',')
+    {
+        ptr++;
+        if (*ptr >= '0' && *ptr <= '9')
+        {
+            *phi = extract_lineno(ptr, &n, 0);
+            ptr += n;
+        }
+    }
+
 	if ((*phi == 0) && (*plo == 0))	*phi = 0xFFFF ;
 	if ((*phi == 0) && (n != 0))    *phi = 0xFFFF ;
 }
@@ -1569,7 +1610,8 @@ int basic (void *ecx, void *edx, void *prompt)
 		*(char *)(memchr (accs, 0x0D, 256) + 1) = 0 ; // Add NUL term for sscanf
 		crlf () ;
 
-		sscanf (accs, "%hu%n", &lino, &n) ;
+        lino = extract_lineno(accs, &n, lino);
+
 		if (lino == 0)
 		    {
 			n = 0 ;
@@ -1658,7 +1700,7 @@ int basic (void *ecx, void *edx, void *prompt)
 					if ((*tmp == 'O') || (*tmp == 'o'))
 					    {
 						n = 0 ;
-						sscanf (tmp + 1, "%u", &n) ;
+                        n = strtol(tmp+1, NULL, 10);
 						lstopt = n ;
 						break ;
 					    }
@@ -1707,7 +1749,7 @@ int basic (void *ecx, void *edx, void *prompt)
 							if (eof || (n <= 0)) break ;
 							*(tmp - 1) = 0x0D ; *tmp = 0 ;
 							tmp = accs ; lino++ ; n = 0 ;
-							sscanf (tmp, "%hu%n", &lino, &n) ;
+                            lino = extract_lineno(tmp, &n, lino);
 							tmp += n ;
 							while ((*tmp == 32) || (*tmp == 9)) tmp++ ;
 							n = lexan (tmp, (char *) esi + 3, 1)

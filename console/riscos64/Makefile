@@ -101,7 +101,7 @@ LD = aarch64-unknown-linux-gnu-ld
 OBJCOPY = aarch64-unknown-linux-gnu-objcopy
 CFLAGS += -Wall -I ../../include -I ../../../BBCSDL/include
 OBJS = bbmain.o bbexec.o bbeval.o bbasmb.o bbdata.o bbccos.o bbccon.o
-OBJS += riscos.o
+OBJS += riscos.o str.o
 
 CXX += ${CFLAGS}
 
