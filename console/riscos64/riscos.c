@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "kernel.h"
 #include "swis.h"
 
@@ -77,3 +78,84 @@ int fileno(FILE *f)
 {
     return f->_fileno;
 }
+
+double sqrt(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double asin(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double atan(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double acos(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double exp(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double cos(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double tan(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double sin(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+long double truncl(long double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+long double floorl(long double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+double pow(double value1, double value2)
+{
+    /* FIXME: Not implemented */
+    return value1;
+}
+
+double log(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
+long long int llabs(long long int value)
+{
+    /* FIXME: Not implemented */
+    if (value < 0)
+        value = -value;
+    return value;
+}
+
