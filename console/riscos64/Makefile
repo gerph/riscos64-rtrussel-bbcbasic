@@ -14,7 +14,6 @@ TARGET ?= bbcbasic
 
 USE_FUNC_SIGNATURE ?= 1
 
-DIS = ~/projects/RO/pyromaniac/utils/riscos-dumpi --arm64
 CROSS_ROOT = ${shell echo $$CROSS_ROOT}
 
 ALL_TARGETS = bbcbasic
@@ -44,14 +43,14 @@ endif
 # Optimisation options
 CFLAGS += -O1
 
-# How much static heap we'll allocate
-CFLAGS += -DHEAP_SIZE=1024
-
 # Options for this build
-CFLAGS +=
+CFLAGS += -I/ro64
+
+# Assembler flags
+AFLAGS = -march=armv8-a
 
 # Flags for the linker
-LDFLAGS = -T link.lnk
+LDFLAGS = -T link.lnk -e _aif64_entry
 
 targetted:
 	make ${TARGET},ff8 TARGET=${TARGET}
@@ -68,7 +67,6 @@ dockcross-linux-arm64:
 
 clean:
 	-rm -f *.o *.a *.bin *,ff8 *.map
-	cd clib && make clean
 
 ifeq (${CROSS_ROOT},)
 # If we're outside the docker container, re-run ourselves inside the container
@@ -76,7 +74,7 @@ ifneq ($(filter-out all shell dockcross-linux-arm64 clean,${MAKECMDGOALS}),)
 # The command wasn't one of our invocation commands above
 .PHONY: ${MAKECMDGOALS}
 ${MAKECMDGOALS}: dockcross-linux-arm64 ${CRT_OBJS}
-	cd ../.. && console/riscos64/dockcross-linux-arm64 --args "-v ${CLIBDIR}:${CLIBDIR}" -- bash -c "cd console/riscos64 && make ${MAKECMDGOALS} TARGET=${TARGET}"
+	cd ../.. && console/riscos64/dockcross-linux-arm64 --args "-v ${CLIBDIR}:/ro64/clib" -- bash -c "cd console/riscos64 && make ${MAKECMDGOALS} TARGET=${TARGET}"
 else
 .PHONY: ${DEFAULT_GOAL}
 ${DEFAULT_GOAL}: dockcross-linux-arm64 ${CRT_OBJS}
@@ -89,13 +87,15 @@ ${CLIBDIR}/libcrt.a:
 	cd ${CLIBDIR}; make
 
 else
-
+# We are within the docker container
+CLIBDIR = /ro64/clib
 
 CRT_OBJS = 	${CLIBDIR}/libcrt.a
 
 VPATH = ../../src ../../include ../../../BBCSDL/src ../../../BBCSDL/include
 
 CXX = aarch64-unknown-linux-gnu-gcc
+CC = aarch64-unknown-linux-gnu-gcc
 AS = aarch64-unknown-linux-gnu-as
 LD = aarch64-unknown-linux-gnu-ld
 OBJCOPY = aarch64-unknown-linux-gnu-objcopy
@@ -131,13 +131,15 @@ bbdata.o: ../../src/bbdata_arm_ro64.s
 #	-o bbcbasic -Wl,-s -Wl,-R,'$$ORIGIN'
 #	cp bbcbasic ../../
 
-#%.o: %.c
-#	${CXX} ${CFLAGS} -c -o $@ $?
+%.o: %.c
+	${CC} ${CFLAGS} -c -o $@ $?
+%.o: %.s
+	${AS} ${AFLAGS} -o $@ $?
 
-${TARGET}.bin: link.lnk ${OBJS}
+${TARGET}.bin: link.lnk ${OBJS} ${CRT_OBJS}
 	${LD} ${OBJS} ${CRT_OBJS} ${LDFLAGS} -o $@
 
-${TARGET}.map: link.lnk ${OBJS}
+${TARGET}.map: link.lnk ${OBJS} ${CRT_OBJS}
 	${LD} ${OBJS} ${CRT_OBJS} ${LDFLAGS} -Map $@ -o /dev/null
 
 ifeq (${USE_FUNC_SIGNATURE},1)

@@ -53,6 +53,15 @@ BOOL WINAPI K32EnumProcessModules (HANDLE, HMODULE*, DWORD, LPDWORD) ;
 #define WM_TIMER 275
 #endif
 
+#ifdef __riscos
+#undef PLATFORM
+#ifdef __riscos64
+#define PLATFORM "RISC OS 64"
+#else
+#define PLATFORM "RISC OS"
+#endif
+#endif
+
 #ifdef __WIN64__
 #undef PLATFORM
 #define PLATFORM "Win64"
@@ -82,7 +91,11 @@ void *userRAM = NULL ;
 void *progRAM = NULL ;
 void *userTOP = NULL ;
 const int bLowercase = 0 ;    // Dummy
+#ifdef __riscos
+const char szVersion[] = "BBC BASIC for "PLATFORM" "VERSION ;
+#else
 const char szVersion[] = "BBC BASIC for "PLATFORM" Console "VERSION ;
+#endif
 const char szNotice[] = "(C) Copyright R. T. Russell, "YEAR ;
 char *szLoadDir ;
 char *szLibrary ;
@@ -455,6 +468,12 @@ void getcsr(int *px, int *py)
 // SOUND Channel,Amplitude,Pitch,Duration
 void sound (short chan, signed char ampl, unsigned char pitch, unsigned char duration)
 {
+#ifdef __riscos
+    _kernel_oserror *err;
+    err = _swix(Sound_Control, _INR(0, 4), chan, ampl, pitch, duration);
+    if (err)
+        error (err->errnum, err->errmess);
+#endif
 }
 
 // ENVELOPE N,T,PI1,PI2,PI3,PN1,PN2,PN3,AA,AD,AS,AR,ALA,ALD
@@ -489,13 +508,27 @@ int vgetc (int x, int y)
 
 int osbyte (int al, int xy)
 {
-	error (255, "Sorry, not implemented") ;
+#ifdef __riscos
+    _kernel_oserror *err;
+    err = _swix(OS_Byte, _INR(0, 3), al, xy & 0xff, xy>>8);
+    if (err)
+        error (err->errnum, err->errmess);
+#else
+    error (255, "Sorry, not implemented") ;
+#endif
 	return -1 ;
 }
 
 void osword (int al, void *xy)
 {
-	error (255, "Sorry, not implemented") ;
+#ifdef __riscos
+    _kernel_oserror *err;
+    err = _swix(OS_Word, _INR(0, 1), al, xy);
+    if (err)
+        error (err->errnum, err->errmess);
+#else
+    error (255, "Sorry, not implemented") ;
+#endif
 	return ;
 }
 
@@ -598,20 +631,22 @@ double fltcall_ (double (*APIfunc) (size_t, size_t, size_t, size_t, size_t, size
 #pragma GCC reset_options
 #endif
 
-#ifdef __riscos
-#else
 // Call a function in the context of the GUI thread:
 size_t guicall (void *func, PARM *parm)
 {
 	return apicall_ (func, parm) ;
 }
-#endif
 
 // Check for Escape (if enabled) and kill:
 void trap (void)
 {
 #ifdef __riscos
     /* FIXME: RISCOS can do this with OS_ReadEscapeState ? */
+    if (_kernel_escape_seen())
+    {
+        _swix(OS_Byte, _IN(0), 0x7c); /* OSByte_ClearEscape */
+        error (17, NULL) ; // 'Escape'
+    }
 #else
 	stdin_handler (NULL, NULL) ;
 
@@ -637,6 +672,7 @@ heapptr xtrap (void)
 {
 #ifdef __riscos
     /* FIXME: RISCOS can do this with OS_ReadEscapeState ? */
+	trap () ;
 #else
 	trap () ;
 	if (flags & ALERT)
@@ -847,7 +883,7 @@ void reset (void)
 
 
 
-
+#ifdef __riscos
 /*************************************************** Gerph *********
  Function:      readline
  Description:   Call OS_ReadLine for input
@@ -859,7 +895,16 @@ static int readline(char *line, int len)
 {
     _kernel_oserror *err;
     int read;
-    uint32_t flags;
+    uint32_t flags = 0;
+#ifdef __riscos64
+    err = _swix(OS_ReadLine32, _INR(0, 4)|_OUTR(0, 1), line, len, 32, 128, 0, &flags, &read);
+    if (err)
+        return 0;
+    if (flags)
+        goto escape;
+    line[read] = '\r';
+    return 1;
+#else
     err = _swix(OS_ReadLine32, _INR(0, 4)|_OUT(1)|_OUT(_FLAGS), line, len, 32, 128, 0, &read, &flags);
 #ifndef ErrorNumber_ModuleBadSWI
 #define ErrorNumber_ModuleBadSWI          0x110 /*  Token for internationalised message */
@@ -871,11 +916,16 @@ static int readline(char *line, int len)
     if (err)
         return 0;
     if (flags & _C)
-        return 0;
-    line[read] = '\0';
+        goto escape;
+    line[read] = '\r';
     return 1;
-}
+#endif
 
+escape:
+    trap();
+    return 0;
+}
+#endif
 
 // Input and edit a string :
 void osline (char *buffer)
@@ -1147,6 +1197,7 @@ void oswait (int cs)
 #ifdef __riscos
     uint32_t start = clock();
     do {
+        trap () ;
         _swix(OS_Byte, _IN(0), 19);
         if (clock() - start >= cs)
             break;
@@ -1977,6 +2028,17 @@ pthread_t hThread = NULL ;
 						PROT_READ | PROT_WRITE, 
 						MAP_PRIVATE | MAP_ANON, -1, 0))))
 		MaximumRAM /= 2 ;
+#endif
+
+#ifdef __riscos64
+    extern char *__heap_base;
+    extern char *__heap_hwm;
+    extern char *__heap_end;
+
+    int ro_available_memory = __heap_end - __heap_base;
+    int ro_allocate = ro_available_memory - 1024*32;
+    if (ro_allocate > 0)
+        userRAM = malloc(ro_allocate);
 #endif
 
 	if ((userRAM == NULL) || (userRAM == (void *)-1))

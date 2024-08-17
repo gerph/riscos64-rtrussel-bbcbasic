@@ -103,25 +103,19 @@ double acos(double value)
     return value;
 }
 
+double fabs(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
 double exp(double value)
 {
     /* FIXME: Not implemented */
     return value;
 }
 
-double cos(double value)
-{
-    /* FIXME: Not implemented */
-    return value;
-}
-
 double tan(double value)
-{
-    /* FIXME: Not implemented */
-    return value;
-}
-
-double sin(double value)
 {
     /* FIXME: Not implemented */
     return value;
@@ -157,5 +151,40 @@ long long int llabs(long long int value)
     if (value < 0)
         value = -value;
     return value;
+}
+
+void __clear_cache(char *begin, char *end)
+{
+    /* FIXME: Not implemented */
+    /* Use OS_SynchroniseCodeAreas ? */
+}
+
+void putevt(void)
+{
+    /* FIXME: Not implemented */
+}
+
+double __extenddftf2(double)
+{
+    /* FIXME: Not implemented */
+    return 0.0;
+}
+
+double __floatditf(double)
+{
+    /* FIXME: Not implemented */
+    return 0.0;
+}
+
+double __netf2(double)
+{
+    /* FIXME: Not implemented */
+    return 0.0;
+}
+
+double __trunctfdf2(double)
+{
+    /* FIXME: Not implemented */
+    return 0.0;
 }
 
