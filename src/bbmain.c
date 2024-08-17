@@ -1608,8 +1608,10 @@ int basic (void *ecx, void *edx, void *prompt)
 		clrtrp () ;
 		osline (accs) ;
 		*(char *)(memchr (accs, 0x0D, 256) + 1) = 0 ; // Add NUL term for sscanf
+#ifndef __riscos
+        /* This seems to get an extra newline on RISC OS */
 		crlf () ;
-
+#endif
         lino = extract_lineno(accs, &n, lino);
 
 		if (lino == 0)
