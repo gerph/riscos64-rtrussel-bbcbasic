@@ -618,9 +618,9 @@ void oscli (char *cmd)
 {
 #ifdef __riscos
     _kernel_oserror *err;
-    int failed;
-    failed = _kernel_oscli(cmd);
-    if (failed)
+    int success;
+    success = _kernel_oscli(cmd);
+    if (!success)
     {
         err = _kernel_last_oserror();
         error(err->errnum, err->errmess);
