@@ -2036,9 +2036,14 @@ pthread_t hThread = NULL ;
     extern char *__heap_end;
 
     int ro_available_memory = __heap_end - __heap_base;
-    int ro_allocate = ro_available_memory - 1024*32;
-    if (ro_allocate > 0)
+    int ro_allocate = ro_available_memory - 1024 * 32;
+    userRAM = NULL;
+    while (userRAM == NULL && ro_allocate >= 32 * 1024)
+    {
+        ro_allocate = (ro_allocate * 3 / 4) & ~1023;
+        //printf("Try allocating %i\n", ro_allocate);
         userRAM = malloc(ro_allocate);
+    }
 #endif
 
 	if ((userRAM == NULL) || (userRAM == (void *)-1))
