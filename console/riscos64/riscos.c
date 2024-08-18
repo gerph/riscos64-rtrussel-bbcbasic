@@ -145,6 +145,12 @@ double log(double value)
     return value;
 }
 
+double trunc(double value)
+{
+    /* FIXME: Not implemented */
+    return value;
+}
+
 long long int llabs(long long int value)
 {
     /* FIXME: Not implemented */
