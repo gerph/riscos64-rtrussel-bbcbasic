@@ -16,6 +16,12 @@
 #include <math.h>
 #include "BBC.h"
 
+#ifdef __riscos
+/* This shouldn't really be here, but I haven't updated the bbccon.c to handle RO SWIs */
+#include "kernel.h"
+#endif
+
+
 // Routines in bbmain:
 int range1 (char) ;		// Test char for valid in a variable name
 signed char nxt (void) ;	// Skip spaces, handle line continuation
@@ -3481,7 +3487,7 @@ VAR xeq (void)
 				VAR v = expr () ;
 				long long (*func) (size_t, size_t, size_t, size_t, size_t, size_t, 
 						   size_t, size_t, size_t, size_t, size_t, size_t) ;
-				PARM parm ;
+				PARM parm = {0};
 				void *ptr = NULL ;
 				unsigned char type = 0 ;
 				parm.f[0] = -1.7e308 ;
@@ -3494,8 +3500,10 @@ VAR xeq (void)
 					memcpy (accs, v.s.p + zero, v.s.l) ;
 					*(accs + v.s.l) = 0 ;
 					func = sysadr (accs) ;
+#ifndef __riscos /* On RISC OS we raise the error it returned */
 					if (func == NULL)
 						error (51, NULL) ; // 'No such system call'
+#endif
 				    }
 				else if (v.i.t == 0)
 					func = (void *)(size_t) v.i.n ;
@@ -3503,8 +3511,10 @@ VAR xeq (void)
 					func = (void *)(size_t) v.f ;
 
 #ifndef __EMSCRIPTEN__
+#ifndef __riscos
 				if ((size_t)func < 0x10000)
 					error (8, NULL) ; // 'Address out of range'
+#endif
 #endif
 
 				while (*esi == ',')
@@ -3540,6 +3550,11 @@ VAR xeq (void)
 					else
 					    {
 						parm.f[nf++] = (double) v.f ;
+#ifdef __riscos
+                        /* We just convert these values to an integer */
+                        long long t = v.f ;
+                        parm.i[ni++] = t;
+#else
 #if defined(__x86_64__) || defined(__aarch64__) || defined(ARMHF)
 #ifdef _WIN32
 						union { double f ; long long i ; } u ;
@@ -3556,17 +3571,93 @@ VAR xeq (void)
 						parm.i[ni++] = u.i.l ;
 						parm.i[ni++] = u.i.h ;
 #endif
+#endif
 					    }
 					if ((ni > 16) || (nf > 8)) 
 						error (31, NULL) ; // 'Incorrect arguments'
 				    }
 
+#ifndef __riscos
 				while (ni)
 				    {
 					if (parm.i[--ni] == memhdc)
 						break ; 
 				    }
+#endif
 
+#ifdef __riscos
+                /* On RISC OS we want to retrieve the values from the call */
+                {
+                    struct output_s {
+                        unsigned char type;
+                        void *ptr;
+                    } output[10] = {0};
+                    if (*esi == TTO)
+                        {
+                            int regno = 0;
+                            do {
+                                esi++ ;
+                                nxt () ;
+                                if (*esi != ',')
+                                {
+                                    ptr = getput (&type) ;
+                                    //printf("Output r%i is type %i, ptr &%x\n", regno, type, ptr);
+                                    output[regno].type = type;
+                                    output[regno].ptr = ptr;
+                                }
+                                regno ++;
+                            } while (regno < 10 && *esi == ',');
+                            /* FIXME: Need flags pointer ? */
+                        }
+                    //printf("SWI call &%x\n", (int)func);
+                    //for (int i=0; i<10; i++)
+                    //{
+                    //    printf("  r%i = %i (&%x)\n", i, parm.i[i], parm.i[i]);
+                    //}
+
+                    _kernel_swi_regs regs = {0};
+                    for (int regno=0; regno<10; regno++)
+                        regs.r[regno] = parm.i[regno];
+
+                    /* Call SWI */
+                    _kernel_oserror *err;
+                    err = _kernel_swi(((int)func) | 0x20000, &regs, &regs);
+                    if (err && (((int)func) & 0x20000) == 0)
+                        error(err->errnum, err->errmess);
+
+                    /* Now write values to outputs */
+                    for (int regno=0; regno<10; regno++)
+                    {
+                        if (output[regno].ptr != NULL)
+                        {
+                            /* They supplied this output */
+                            unsigned char type = output[regno].type;
+                            if (type == 10)
+                            {
+                                /* Float value */
+                                v.i.t = 1; /* ? */
+                                v.f = regs.r[regno];
+                                storen(v, output[regno].ptr, type);
+                            }
+                            else if (type == 136)
+                            {
+                                /* String value */
+                                v.s.t = -1;
+                                v.s.p = ((char *)regs.r[regno]) - (char*)zero;
+                                v.s.l = regs.r[regno] == 0 ? 0 : strlen((char*)regs.r[regno]);
+                                stores(v, output[regno].ptr, type);
+                            }
+                            else if (type == 4)
+                            {
+                                v.i.t = 0;
+                                v.i.n = regs.r[regno];
+                                storen(v, output[regno].ptr, type);
+                            }
+                        }
+                    }
+                }
+            }
+#else
 				if (*esi == TTO)
 				    {
 					esi++ ;
@@ -3593,6 +3684,7 @@ VAR xeq (void)
 				if (ptr)
 					storen (v, ptr, type) ;
 				}
+#endif
 				break ;
 
 /*********************************** OSCLI *************************************/

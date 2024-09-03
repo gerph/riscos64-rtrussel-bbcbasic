@@ -1254,7 +1254,12 @@ void mouseto (int x, int y)
 void *sysadr (char *name)
 {
 #ifdef __riscos
-    return NULL; /* Not implemented on RISC OS */
+    /* On RISC OS this is the SWI name to number conversion */
+    uint32_t number;
+    _kernel_oserror *err = _swix(OS_SWINumberFromString, _IN(1)|_OUT(0), name, &number);
+    if (err)
+        error(err->errnum, err->errmess);
+    return (void*)number;
 #else
 	void *addr = NULL ;
 	if (addr != NULL)
@@ -2044,6 +2049,7 @@ pthread_t hThread = NULL ;
         //printf("Try allocating %i\n", ro_allocate);
         userRAM = malloc(ro_allocate);
     }
+    MaximumRAM = ro_allocate;
 #endif
 
 	if ((userRAM == NULL) || (userRAM == (void *)-1))
