@@ -1,1 +1,5 @@
 dockcross-linux-arm64
+clib/
+bbcbasic,ff8
+bbcbasic.bin
+bbcbasic.syms
