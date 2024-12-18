@@ -2634,7 +2634,7 @@ VAR xeq (void)
 				b = expri () ;
 				plot (4, x, y) ;
 				plot (0, a, 0) ;
-				plot (n, 0, b) ;
+				plot (n, -a, b) ;
 				}
 				break ;
 
