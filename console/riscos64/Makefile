@@ -16,7 +16,7 @@ CROSS_ROOT = ${shell echo $$CROSS_ROOT}
 
 ALL_TARGETS = bbcbasic
 
-CLIB_VERSION = 0.07
+CLIB_VERSION = 0.11
 CLIB_URL = https://github.com/gerph/riscos64-simple-binaries/releases/download/v${CLIB_VERSION}/RISCOS64-CLib-${CLIB_VERSION}.zip
 
 
@@ -58,7 +58,7 @@ clib/clib-${CLIB_VERSION}.zip:
 	wget -O clib/clib-${CLIB_VERSION}.zip "${CLIB_URL}"
 
 clib/libcrt.a: clib/clib-${CLIB_VERSION}.zip
-	cd clib && unzip -u clib-${CLIB_VERSION}.zip
+	cd clib && unzip -u clib-${CLIB_VERSION}.zip && touch libcrt.a
 
 else
 # We are within the docker container

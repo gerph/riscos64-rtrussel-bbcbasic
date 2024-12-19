@@ -320,7 +320,7 @@ int range2 (char c)
 // Error code 256 signifies return to immediate mode
 void error (int code, const char * msg)
 {
-	if ((code < 0) || (code >= 256))
+	if ((code < 0) || (code == 256))
 		longjmp (env, code) ; // Quit or immediate mode
 	if (msg == NULL)
 	    {

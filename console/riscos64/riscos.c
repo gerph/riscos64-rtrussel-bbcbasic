@@ -74,11 +74,6 @@ ssize_t read(int fileno, char *data, size_t size)
     return size - not_transferred;
 }
 
-int fileno(FILE *f)
-{
-    return f->_fileno;
-}
-
 double sqrt(double value)
 {
     /* FIXME: Not implemented */
@@ -127,6 +122,13 @@ long double truncl(long double value)
     return value;
 }
 
+double trunc(double value)
+{
+    long long t = value;
+    /* FIXME: Not implemented */
+    return t;
+}
+
 long double floorl(long double value)
 {
     /* FIXME: Not implemented */
@@ -140,12 +142,6 @@ double pow(double value1, double value2)
 }
 
 double log(double value)
-{
-    /* FIXME: Not implemented */
-    return value;
-}
-
-double trunc(double value)
 {
     /* FIXME: Not implemented */
     return value;

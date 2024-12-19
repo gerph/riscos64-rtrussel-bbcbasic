@@ -480,11 +480,13 @@ static void isloc (void)
 // Send a PLOT command:
 static void plot (int n, int x, int y)
 {
+    x = x & 65535;
+    y = y & 65535;
 	oswrch (25) ;
 	oswrch (n) ;
-	oswrch (x) ;
+	oswrch (x & 255) ;
 	oswrch (x >> 8) ;
-	oswrch (y) ;
+	oswrch (y & 255) ;
 	oswrch (y >> 8) ;
 }
 
@@ -1322,7 +1324,10 @@ VAR xeq (void)
 				}
 
 			case TEND:
+#ifndef __riscos
+                /* END does not shut all files */
 				osshut (0) ;
+#endif
 			case 0:
 				error (256, NULL) ;
 

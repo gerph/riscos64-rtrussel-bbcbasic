@@ -313,7 +313,7 @@ register heapptr *esp asm ("x28") ;	// Stack pointer
 #endif
 
 // Data locations (defined in bbdata_xxx_xx.nas):
-extern unsigned char errnum ;	// Error code number
+extern unsigned int errnum ;	// Error code number
 extern char *accs ;		// String accumulator
 extern char *buff ;		// Temporary line buffer
 extern heapptr *onersp ;	// ON ERROR LOCAL stack pointer

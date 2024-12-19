@@ -216,8 +216,9 @@ errlin:.long	0		/* Pointer to last error statement */
 prand:
 random:.fill	5,1,0		/* Current 'random' number (5 bytes) */
 vwidth:.byte	0		/* Current value of WIDTH */
-errnum:.byte	0		/* Error code of last error */
 liston:.byte	0		/* *FLOAT / *HEX / *LOWERCASE / OPT */
+    .balign 16
+errnum:.word    0       /* Error code of last error */
 
 /* Variables used by OS-specific modules (bbcmos, bbccli, bbcvdu, bbcvtx) */
 
